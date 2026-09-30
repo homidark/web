@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 560" role="img" aria-labelledby="title description">
+  <title id="title">High process activity settling into a smoother, lower-load process</title>
+  <desc id="description">An illustrative comparison of a spiky process trace and a steadier process trace. It does not represent benchmark data.</desc>
+  <style>
+    .trace { stroke-dasharray: 1100; stroke-dashoffset: 1100; animation: draw 2.2s cubic-bezier(.2,.7,.2,1) .2s forwards; }
+    .trace-steady { animation-delay: .45s; }
+    @keyframes draw { to { stroke-dashoffset: 0; } }
+    @media (prefers-reduced-motion: reduce) { .trace { animation: none; stroke-dashoffset: 0; } }
+  </style>
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#dce3ce" stroke-opacity=".065" stroke-width="1"/>
+    </pattern>
+    <linearGradient id="hot-area" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ed956b" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#ed956b" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="steady-area" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c6f36a" stop-opacity=".19"/>
+      <stop offset="1" stop-color="#c6f36a" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="soft-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="1180" height="560" fill="#141712"/>
+  <rect width="1180" height="560" fill="url(#grid)"/>
+  <path d="M0 78H1180" stroke="#dce3ce" stroke-opacity=".16"/>
+  <text x="48" y="49" fill="#c6f36a" font-family="monospace" font-size="12" letter-spacing="2">PROCESS LOAD / CONCEPT</text>
+  <text x="1132" y="49" fill="#a4a99b" font-family="monospace" font-size="10" text-anchor="end" letter-spacing="1">01 — 02</text>
+
+  <rect x="48" y="112" width="478" height="382" fill="#191c17" stroke="#56594e"/>
+  <rect x="654" y="112" width="478" height="382" fill="#191c17" stroke="#727f57"/>
+  <path d="M66 130h26M66 130v26M508 130h-26M508 130v26M672 130h26M672 130v26M1114 130h-26M1114 130v26" fill="none" stroke="#c6f36a" stroke-width="2"/>
+  <text x="78" y="172" fill="#ed956b" font-family="monospace" font-size="11" letter-spacing="2">01 / HIGH PROCESS</text>
+  <text x="684" y="172" fill="#c6f36a" font-family="monospace" font-size="11" letter-spacing="2">02 / LOWER PROCESS</text>
+  <text x="78" y="208" fill="#f3f1e9" font-family="sans-serif" font-size="27" font-weight="700">BUSY + UNEVEN</text>
+  <text x="684" y="208" fill="#f3f1e9" font-family="sans-serif" font-size="27" font-weight="700">CALMER + SMOOTHER</text>
+
+  <path d="M94 252H492M94 300H492M94 348H492M94 396H492M94 444H492" stroke="#dce3ce" stroke-opacity=".11"/>
+  <path d="M700 252H1098M700 300H1098M700 348H1098M700 396H1098M700 444H1098" stroke="#dce3ce" stroke-opacity=".11"/>
+  <path d="M94 246V444H492M700 246V444H1098" fill="none" stroke="#dce3ce" stroke-opacity=".3"/>
+  <text x="94" y="468" fill="#969b8c" font-family="monospace" font-size="9" letter-spacing="1">ACTIVITY OVER TIME</text>
+  <text x="700" y="468" fill="#969b8c" font-family="monospace" font-size="9" letter-spacing="1">ACTIVITY OVER TIME</text>
+
+  <path d="M96 414 L127 397 L151 410 L176 306 L197 348 L222 283 L244 390 L270 374 L295 258 L316 337 L342 325 L366 407 L391 295 L414 348 L438 278 L464 365 L490 331 L490 444 L96 444Z" fill="url(#hot-area)"/>
+  <path class="trace" d="M96 414 L127 397 L151 410 L176 306 L197 348 L222 283 L244 390 L270 374 L295 258 L316 337 L342 325 L366 407 L391 295 L414 348 L438 278 L464 365 L490 331" fill="none" stroke="#ed956b" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" filter="url(#soft-glow)"/>
+  <circle cx="490" cy="331" r="5" fill="#ed956b"/>
+
+  <path d="M702 399 C736 386 759 390 786 385 S836 376 862 380 S912 371 938 376 S988 365 1014 371 S1064 360 1096 366 L1096 444 L702 444Z" fill="url(#steady-area)"/>
+  <path class="trace trace-steady" d="M702 399 C736 386 759 390 786 385 S836 376 862 380 S912 371 938 376 S988 365 1014 371 S1064 360 1096 366" fill="none" stroke="#c6f36a" stroke-width="4" stroke-linecap="round" filter="url(#soft-glow)"/>
+  <circle cx="1096" cy="366" r="5" fill="#c6f36a"/>
+
+  <path d="M548 302H628M609 283L628 302L609 321" fill="none" stroke="#c6f36a" stroke-width="2"/>
+  <circle cx="588" cy="302" r="23" fill="#141712" stroke="#626957"/>
+  <path d="M577 302H599M591 294L599 302L591 310" fill="none" stroke="#c6f36a" stroke-width="2"/>
+  <text x="48" y="531" fill="#a4a99b" font-family="monospace" font-size="10" letter-spacing="1">ILLUSTRATIVE VISUAL — NOT A PERFORMANCE BENCHMARK</text>
+  <text x="1132" y="531" fill="#c6f36a" font-family="monospace" font-size="10" text-anchor="end" letter-spacing="1">HOMI / OPTIMIZER</text>
+</svg>

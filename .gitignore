@@ -1,0 +1,4 @@
+.env
+accounts.sqlite3
+site-content.json
+__pycache__/

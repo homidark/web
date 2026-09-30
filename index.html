@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10120f">
+  <meta name="description" content="Platinum Optimizer + Homi. Tools, updates, and downloads.">
+  <title>Platinum Optimizer + Homi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="cursor-tracker" id="cursor-tracker" aria-hidden="true"><span></span></div>
+  <div class="site-shell">
+    <header class="topbar">
+      <a class="wordmark" href="#top" aria-label="Platinum Optimizer home"><span class="wordmark-mark">P<span>+</span></span><span>HOMI<span class="wordmark-dot">.</span></span></a>
+      <nav class="navigation" aria-label="Main navigation">
+        <a href="#example">Example</a>
+        <a href="#downloads">Downloads</a>
+        <button id="dashboard-nav" class="nav-button" type="button">Dashboard</button>
+        <button id="account-nav" class="nav-button nav-button-light" type="button">Create account <span aria-hidden="true">↗</span></button>
+      </nav>
+      <button class="mobile-menu" id="mobile-menu" type="button" aria-label="Open menu" aria-expanded="false"><span></span><span></span></button>
+    </header>
+
+    <main id="top">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-grid" aria-hidden="true"></div>
+        <div class="hero-meta"><span class="live-dot"></span><span id="hero-eyebrow">SYSTEM TOOLS / BUILT BY HOMI</span><span class="meta-right">INDEPENDENT PROJECT <span>—</span> 2026</span></div>
+        <div class="hero-content">
+          <p class="hero-overline">TUNE YOUR SETUP. KEEP YOUR EDGE.</p>
+          <h1 id="hero-title"><span>PLATINUM</span><span class="title-second">OPTIMIZER<span class="plus-mark">+</span></span><span class="title-last">HOMI<span class="title-period">.</span></span></h1>
+          <div class="hero-bottom">
+            <p id="hero-description">A focused collection of system tools and updates.<br>Pick a build, review the details, and get started.</p>
+            <a class="round-link" href="#downloads" aria-label="Explore downloads"><span>EXPLORE<br>BUILDS</span><b aria-hidden="true">↓</b></a>
+          </div>
+        </div>
+        <div class="hero-index"><span>01</span><span class="index-line"></span><span>03</span></div>
+        <div class="hero-stamp" aria-hidden="true"><span>OPTIMIZE</span><b>+</b><span>REPEAT</span></div>
+      </section>
+
+      <section class="process-example section-wrap" id="example" aria-labelledby="example-title">
+        <div class="section-heading reveal-target">
+          <div class="section-index"><span>01</span><span class="index-line"></span><span>PROCESS EXAMPLE</span></div>
+          <div class="heading-layout"><p class="micro-label">HIGH LOAD / LOWER LOAD</p><h2 id="example-title">LESS LOAD<span class="lime">.</span></h2></div>
+          <p id="examples-description" class="section-intro">An illustrative look at busy background activity settling into a steadier, smoother process.</p>
+        </div>
+        <figure class="process-figure reveal-target">
+          <img class="process-graphic" src="/process-flow.svg" alt="Illustrative comparison: a jagged high-process activity line settles into a lower, smoother line." width="1180" height="560">
+          <figcaption><span>PROCESS FLOW / CONCEPTUAL</span><span>ACTUAL RESULTS VARY BY DEVICE AND WORKLOAD</span></figcaption>
+        </figure>
+        <div class="driver-examples">
+          <div class="driver-examples-heading reveal-target">
+            <p class="micro-label">02 / OUTSIDE THIS TOOL</p>
+            <h3>DRIVER<br>FAILURES<span class="lime">.</span></h3>
+            <p>This optimizer does not install or repair device drivers.</p>
+          </div>
+          <div class="driver-example-list" id="driver-example-list" aria-label="Driver issues this optimizer does not fix"></div>
+        </div>
+      </section>
+
+      <section class="downloads" id="downloads" aria-labelledby="downloads-title">
+        <div class="download-topline reveal-target"><span>02 / GET THE BUILD</span><span>CHOOSE YOUR VERSION <span class="lime">●</span></span></div>
+        <div class="download-intro reveal-target"><p class="micro-label">PLATINUM OPTIMIZER + HOMI</p><h2 id="downloads-title">YOUR NEXT<br><span>MOVE.</span></h2><p id="downloads-description">Select a release below. Each button opens the original file on GitHub.</p></div>
+        <div class="download-list" id="download-list"></div>
+        <p class="download-note reveal-target"><span class="note-mark">i</span> Always review a script before running it. Downloads are hosted on GitHub.</p>
+      </section>
+
+      <footer class="footer reveal-target">
+        <a class="wordmark footer-brand" href="#top"><span class="wordmark-mark">P<span>+</span></span><span>HOMI<span class="wordmark-dot">.</span></span></a>
+        <p>INDEPENDENTLY BUILT. SHARED WITH CARE.</p>
+        <a class="back-top" href="#top">BACK TO TOP <span aria-hidden="true">↑</span></a>
+      </footer>
+    </main>
+  </div>
+
+  <dialog class="auth-dialog" id="auth-dialog" aria-labelledby="auth-title">
+    <form method="dialog"><button class="dialog-close" aria-label="Close sign-in dialog">×</button></form>
+    <div class="dialog-mark">P<span>+</span></div>
+    <p class="micro-label" id="auth-mode-label">HOMI ACCOUNT / SIGN IN</p>
+    <h2 id="auth-title">WELCOME<br>BACK<span class="lime">.</span></h2>
+    <div class="auth-tabs" role="group" aria-label="Account action"><button type="button" class="auth-tab active" data-mode="login">Sign in</button><button type="button" class="auth-tab" data-mode="register">Create account</button></div>
+    <form id="auth-form" class="auth-form">
+      <label>Username<input name="username" autocomplete="username" required minlength="3" maxlength="32"></label>
+      <label>Password<input name="password" type="password" autocomplete="current-password" required minlength="12"></label>
+      <p class="form-error" id="auth-error" role="alert"></p>
+      <button class="submit-button" id="auth-submit" type="submit">SIGN IN <span aria-hidden="true">↗</span></button>
+    </form>
+    <p class="auth-footnote">Accounts are managed by this site. No external sign-in provider.</p>
+  </dialog>
+
+  <section class="dashboard" id="dashboard" hidden aria-labelledby="dashboard-title">
+    <header class="dashboard-bar"><a class="wordmark" href="#top"><span class="wordmark-mark">P<span>+</span></span><span>HOMI<span class="wordmark-dot">.</span></span></a><div class="dashboard-user"><span class="live-dot"></span><span id="dashboard-username"></span><button id="signout-button" type="button">Sign out</button></div></header>
+    <main class="dashboard-main">
+      <button class="back-link" id="back-to-site" type="button">← BACK TO SITE</button>
+      <div class="dashboard-heading"><div><p class="micro-label">OWNER CONTROL / SITE CONTENT</p><h1 id="dashboard-title">DASHBOARD<span class="lime">.</span></h1></div><span class="owner-badge">OWNER ACCESS</span></div>
+      <p class="dashboard-copy">Edit page text, appearance, process and driver examples, and release links. Changes are saved on this server.</p>
+      <form id="content-form" class="content-form">
+        <div id="content-fields"></div>
+        <div class="save-row"><p class="form-message" id="save-message" role="status"></p><button class="submit-button" type="submit">SAVE CHANGES <span aria-hidden="true">↗</span></button></div>
+      </form>
+    </main>
+  </section>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
