@@ -1,4 +1,5 @@
 import os
+import socket
 import tkinter as tk
 import webbrowser
 from threading import Thread
@@ -6,7 +7,7 @@ from tkinter import messagebox
 
 from werkzeug.serving import BaseWSGIServer, make_server
 
-from server import app, initialize
+from server import app, initialize, load_dotenv
 
 
 INK = "#10120f"
@@ -16,13 +17,28 @@ LIME = "#c6f36a"
 MUTED = "#a4a99b"
 
 
+def get_lan_ip() -> str | None:
+    try:
+        addresses = socket.getaddrinfo(socket.gethostname(), None, family=socket.AF_INET)
+    except OSError:
+        return None
+    for address in addresses:
+        ip_address = address[4][0]
+        if not ip_address.startswith(("127.", "169.254.")):
+            return ip_address
+    return None
+
+
 class ControlPanel:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
+        load_dotenv()
         self.server: BaseWSGIServer | None = None
         self.host = os.environ.get("HOST", "127.0.0.1")
         self.port = int(os.environ.get("PORT", "8000"))
         self.url = f"http://127.0.0.1:{self.port}"
+        lan_ip = get_lan_ip()
+        self.lan_url = f"http://{lan_ip}:{self.port}" if lan_ip else "LAN address unavailable"
         self.state_label: tk.Label
         self.detail_label: tk.Label
         self.start_button: tk.Button
@@ -59,7 +75,8 @@ class ControlPanel:
         tk.Label(status_top, text="STATUS", bg=SURFACE, fg=MUTED, font=("Consolas", 9)).pack(side="left")
         self.state_label = tk.Label(status_top, text="STARTING", bg=SURFACE, fg=LIME, font=("Consolas", 10, "bold"))
         self.state_label.pack(side="right")
-        tk.Label(status, text=self.url, bg=SURFACE, fg=PAPER, font=("Consolas", 10)).pack(anchor="w", pady=(12, 3))
+        tk.Label(status, text=f"This computer: {self.url}", bg=SURFACE, fg=PAPER, font=("Consolas", 9)).pack(anchor="w", pady=(12, 3))
+        tk.Label(status, text=f"Same Wi-Fi: {self.lan_url}", bg=SURFACE, fg=LIME, font=("Consolas", 9)).pack(anchor="w", pady=(3, 3))
         self.detail_label = tk.Label(status, text="", bg=SURFACE, fg=MUTED, font=("Segoe UI", 9), wraplength=420, justify="left", anchor="w")
         self.detail_label.pack(fill="x", pady=(3, 0))
 
