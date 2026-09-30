@@ -1,11 +1,12 @@
 import os
 import tkinter as tk
 import webbrowser
-from http.server import ThreadingHTTPServer
 from threading import Thread
 from tkinter import messagebox
 
-from server import SiteHandler, initialize
+from werkzeug.serving import BaseWSGIServer, make_server
+
+from server import app, initialize
 
 
 INK = "#10120f"
@@ -18,7 +19,7 @@ MUTED = "#a4a99b"
 class ControlPanel:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
-        self.server: ThreadingHTTPServer | None = None
+        self.server: BaseWSGIServer | None = None
         self.host = os.environ.get("HOST", "127.0.0.1")
         self.port = int(os.environ.get("PORT", "8000"))
         self.url = f"http://127.0.0.1:{self.port}"
@@ -115,7 +116,8 @@ class ControlPanel:
         if self.server is not None:
             return
         try:
-            server = ThreadingHTTPServer((self.host, self.port), SiteHandler)
+            app.config["SITE_PAUSED"] = False
+            server = make_server(self.host, self.port, app, threaded=True)
             server.paused = False
             thread = Thread(target=server.serve_forever, name="HomiSiteServer", daemon=True)
             thread.start()
@@ -127,11 +129,13 @@ class ControlPanel:
     def pause(self) -> None:
         if self.server is not None:
             self.server.paused = True
+            app.config["SITE_PAUSED"] = True
             self.set_status("PAUSED", "Requests receive a pause notice until you resume the site.", "#ffd27a")
 
     def resume(self) -> None:
         if self.server is not None:
             self.server.paused = False
+            app.config["SITE_PAUSED"] = False
             self.set_status("RUNNING", "The website is live on this computer.", LIME)
 
     def stop(self) -> None:
@@ -139,6 +143,7 @@ class ControlPanel:
         if server is None:
             return
         self.server = None
+        app.config["SITE_PAUSED"] = False
         server.shutdown()
         server.server_close()
         self.set_status("STOPPED", "Server stopped. Your site files and saved content are unchanged.", LIME)

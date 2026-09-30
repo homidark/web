@@ -7,14 +7,13 @@ import os
 import re
 import secrets
 import sqlite3
-import sys
 import time
 import xml.etree.ElementTree as ET
-from http import HTTPStatus
-from http.cookies import SimpleCookie
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import urlsplit
+
+from flask import Flask, Response, jsonify, request, send_from_directory
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 ROOT = Path(__file__).resolve().parent
 DATABASE = ROOT / "accounts.sqlite3"
@@ -23,6 +22,10 @@ SESSION_COOKIE = "homi_session"
 SESSION_TTL = 8 * 60 * 60
 PASSWORD_ITERATIONS = 310_000
 SESSIONS: dict[str, tuple[str, float]] = {}
+app = Flask(__name__, static_folder=None)
+app.config["MAX_CONTENT_LENGTH"] = 100_000
+app.config["SITE_PAUSED"] = False
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1)
 
 
 def load_dotenv() -> None:
@@ -136,223 +139,190 @@ def validate_content(candidate: object, template: object, path: str = "content")
     return candidate
 
 
-class SiteHandler(BaseHTTPRequestHandler):
-    server_version = "HomiSite/1.0"
+def validate_origin() -> bool:
+    origin = request.headers.get("Origin")
+    return not origin or urlsplit(origin).netloc == request.host
 
-    def log_message(self, format: str, *args: object) -> None:
-        if sys.stdout is not None:
-            print(f"[{self.log_date_time_string()}] {args[0] if args else format}")
 
-    def send_json(self, data: object, status: int = 200, headers: dict[str, str] | None = None) -> None:
-        payload = json.dumps(data).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(payload)))
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
-        if headers:
-            for key, value in headers.items():
-                self.send_header(key, value)
-        self.end_headers()
-        self.wfile.write(payload)
+def current_user() -> sqlite3.Row | None:
+    token = request.cookies.get(SESSION_COOKIE)
+    session = SESSIONS.get(token) if token else None
+    if not session:
+        return None
+    username, expiry = session
+    if expiry < time.time():
+        SESSIONS.pop(token, None)
+        return None
+    with connect_db() as database:
+        return database.execute(
+            "SELECT username, is_owner FROM users WHERE username = ? COLLATE NOCASE",
+            (username,),
+        ).fetchone()
 
-    def send_paused(self) -> None:
-        body = b"<!doctype html><html lang='en'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Site paused</title><body style='margin:0;padding:12vh 8vw;background:#10120f;color:#f3f1e9;font:16px system-ui'><p style='color:#c6f36a;font:12px monospace'>HOMI / SERVER CONTROL</p><h1 style='font-size:clamp(36px,8vw,72px)'>SITE PAUSED</h1><p>The server owner paused this site. Refresh after it resumes.</p></body></html>"
-        self.send_response(HTTPStatus.SERVICE_UNAVAILABLE)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("Retry-After", "5")
-        self.end_headers()
-        self.wfile.write(body)
 
-    def read_json(self) -> object:
-        try:
-            length = int(self.headers.get("Content-Length", "0"))
-        except ValueError as error:
-            raise ValueError("Invalid request length.") from error
-        if length < 1 or length > 100_000:
-            raise ValueError("Request body is empty or too large.")
-        try:
-            return json.loads(self.rfile.read(length))
-        except (json.JSONDecodeError, UnicodeDecodeError) as error:
-            raise ValueError("Invalid JSON.") from error
+@app.before_request
+def reject_requests_while_paused():
+    if not app.config.get("SITE_PAUSED"):
+        return None
+    body = """<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Site paused</title><body style="margin:0;padding:12vh 8vw;background:#10120f;color:#f3f1e9;font:16px system-ui"><p style="color:#c6f36a;font:12px monospace">HOMI / SERVER CONTROL</p><h1 style="font-size:clamp(36px,8vw,72px)">SITE PAUSED</h1><p>The server owner paused this site. Refresh after it resumes.</p></body></html>"""
+    return Response(body, status=503, content_type="text/html; charset=utf-8", headers={"Retry-After": "5", "Cache-Control": "no-store"})
 
-    def validate_origin(self) -> bool:
-        origin = self.headers.get("Origin")
-        if not origin:
-            return True
-        return urlsplit(origin).netloc == self.headers.get("Host")
 
-    def user(self) -> sqlite3.Row | None:
-        cookie = SimpleCookie()
-        cookie.load(self.headers.get("Cookie", ""))
-        morsel = cookie.get(SESSION_COOKIE)
-        if not morsel:
-            return None
-        session = SESSIONS.get(morsel.value)
-        if not session:
-            return None
-        username, expiry = session
-        if expiry < time.time():
-            SESSIONS.pop(morsel.value, None)
-            return None
+@app.after_request
+def apply_security_headers(response):
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Cache-Control", "no-store")
+    return response
+
+
+@app.get("/")
+def home():
+    return send_from_directory(ROOT, "index.html")
+
+
+@app.get("/styles.css")
+def styles():
+    return send_from_directory(ROOT, "styles.css")
+
+
+@app.get("/app.js")
+def javascript():
+    return send_from_directory(ROOT, "app.js")
+
+
+@app.get("/process-flow.svg")
+def process_svg():
+    accent = request.args.get("accent", DEFAULT_CONTENT["theme"]["accent"])
+    if not re.fullmatch(r"#[0-9a-fA-F]{6}", accent):
+        return Response(status=400)
+    root = ET.fromstring((ROOT / "process-flow.svg").read_bytes())
+    default_accent = DEFAULT_CONTENT["theme"]["accent"]
+    for element in root.iter():
+        for name, value in element.attrib.items():
+            if value.lower() == default_accent:
+                element.set(name, accent)
+    return Response(ET.tostring(root, encoding="utf-8", xml_declaration=True), mimetype="image/svg+xml")
+
+
+@app.get("/api/content")
+def get_content():
+    try:
+        return jsonify(content=json.loads(CONTENT_FILE.read_text(encoding="utf-8")))
+    except (OSError, json.JSONDecodeError):
+        return jsonify(error="Site content could not be loaded."), 500
+
+
+@app.get("/api/me")
+def get_current_user():
+    user = current_user()
+    return jsonify(user={"username": user["username"], "isOwner": bool(user["is_owner"])} if user else None)
+
+
+def set_session_cookie(response, token: str, max_age: int = SESSION_TTL):
+    response.set_cookie(
+        SESSION_COOKIE,
+        token,
+        max_age=max_age,
+        path="/",
+        secure=request.is_secure,
+        httponly=True,
+        samesite="Strict",
+    )
+    return response
+
+
+@app.post("/api/logout")
+def logout():
+    if not validate_origin():
+        return jsonify(error="Request origin not allowed."), 403
+    token = request.cookies.get(SESSION_COOKIE)
+    if token:
+        SESSIONS.pop(token, None)
+    return set_session_cookie(jsonify(ok=True), "", 0)
+
+
+@app.post("/api/login")
+@app.post("/api/register")
+def authenticate():
+    if not validate_origin():
+        return jsonify(error="Request origin not allowed."), 403
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify(error="Invalid JSON."), 400
+    username = data.get("username", "")
+    password = data.get("password", "")
+    if not isinstance(username, str) or not isinstance(password, str):
+        return jsonify(error="Enter a username and password."), 400
+    username = username.strip()
+    if len(username) < 3 or len(username) > 32 or not re.fullmatch(r"[A-Za-z0-9_.-]+", username):
+        return jsonify(error="Username must be 3-32 letters, numbers, dots, underscores, or hyphens."), 400
+    if len(password) < 12 or len(password) > 256:
+        return jsonify(error="Password must be between 12 and 256 characters."), 400
+
+    try:
         with connect_db() as database:
-            return database.execute("SELECT username, is_owner FROM users WHERE username = ? COLLATE NOCASE", (username,)).fetchone()
+            existing = database.execute(
+                "SELECT username, salt, password_hash, is_owner FROM users WHERE username = ? COLLATE NOCASE",
+                (username,),
+            ).fetchone()
+            if request.path == "/api/register":
+                if existing:
+                    return jsonify(error="That username is already in use."), 400
+                salt = secrets.token_bytes(16)
+                database.execute(
+                    "INSERT INTO users (username, salt, password_hash, is_owner) VALUES (?, ?, ?, 0)",
+                    (username, salt, password_hash(password, salt)),
+                )
+                existing = database.execute(
+                    "SELECT username, salt, password_hash, is_owner FROM users WHERE username = ? COLLATE NOCASE",
+                    (username,),
+                ).fetchone()
+            elif not existing or not hmac.compare_digest(
+                password_hash(password, existing["salt"]), existing["password_hash"]
+            ):
+                return jsonify(error="Username or password is incorrect."), 401
+    except sqlite3.IntegrityError:
+        return jsonify(error="That username is already in use."), 409
 
-    def session_headers(self, token: str, max_age: int = SESSION_TTL) -> dict[str, str]:
-        return {"Set-Cookie": f"{SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={max_age}"}
+    token = secrets.token_urlsafe(32)
+    SESSIONS[token] = (existing["username"], time.time() + SESSION_TTL)
+    response = jsonify(user={"username": existing["username"], "isOwner": bool(existing["is_owner"])})
+    return set_session_cookie(response, token)
 
-    def static_file(self, filename: str) -> None:
-        path = ROOT / filename
-        if not path.is_file():
-            self.send_error(HTTPStatus.NOT_FOUND)
-            return
-        body = path.read_bytes()
-        content_type = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml"}.get(path.suffix, "application/octet-stream")
-        self.send_response(HTTPStatus.OK)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
-        self.end_headers()
-        self.wfile.write(body)
 
-    def process_svg(self, accent: str) -> None:
-        if not re.fullmatch(r"#[0-9a-fA-F]{6}", accent):
-            self.send_error(HTTPStatus.BAD_REQUEST)
-            return
-        root = ET.fromstring((ROOT / "process-flow.svg").read_bytes())
-        default_accent = DEFAULT_CONTENT["theme"]["accent"]
-        for element in root.iter():
-            for name, value in element.attrib.items():
-                if value.lower() == default_accent:
-                    element.set(name, accent)
-        body = ET.tostring(root, encoding="utf-8", xml_declaration=True)
-        self.send_response(HTTPStatus.OK)
-        self.send_header("Content-Type", "image/svg+xml; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("X-Content-Type-Options", "nosniff")
-        self.end_headers()
-        self.wfile.write(body)
+@app.put("/api/content")
+def save_content():
+    if not validate_origin():
+        return jsonify(error="Request origin not allowed."), 403
+    user = current_user()
+    if not user or not user["is_owner"]:
+        return jsonify(error="Owner sign-in is required."), 403
+    candidate = request.get_json(silent=True)
+    if candidate is None:
+        return jsonify(error="Invalid JSON."), 400
+    try:
+        content = validate_content(candidate, DEFAULT_CONTENT)
+        CONTENT_FILE.write_text(json.dumps(content, indent=2, ensure_ascii=False), encoding="utf-8")
+        return jsonify(ok=True, content=content)
+    except ValueError as error:
+        return jsonify(error=str(error)), 400
+    except OSError:
+        return jsonify(error="Could not save site content on the server."), 500
 
-    def do_GET(self) -> None:
-        if getattr(self.server, "paused", False):
-            self.send_paused()
-            return
-        path = urlsplit(self.path).path
-        if path == "/":
-            self.static_file("index.html")
-        elif path == "/styles.css":
-            self.static_file("styles.css")
-        elif path == "/app.js":
-            self.static_file("app.js")
-        elif path == "/process-flow.svg":
-            accent = parse_qs(urlsplit(self.path).query).get("accent", [DEFAULT_CONTENT["theme"]["accent"]])[0]
-            self.process_svg(accent)
-        elif path == "/api/content":
-            try:
-                self.send_json({"content": json.loads(CONTENT_FILE.read_text(encoding="utf-8"))})
-            except (OSError, json.JSONDecodeError):
-                self.send_json({"error": "Site content could not be loaded."}, HTTPStatus.INTERNAL_SERVER_ERROR)
-        elif path == "/api/me":
-            user = self.user()
-            self.send_json({"user": {"username": user["username"], "isOwner": bool(user["is_owner"])} if user else None})
-        else:
-            self.send_error(HTTPStatus.NOT_FOUND)
 
-    def do_POST(self) -> None:
-        if getattr(self.server, "paused", False):
-            self.send_paused()
-            return
-        path = urlsplit(self.path).path
-        if not self.validate_origin():
-            self.send_json({"error": "Request origin not allowed."}, HTTPStatus.FORBIDDEN)
-            return
-        if path == "/api/logout":
-            cookie = SimpleCookie()
-            cookie.load(self.headers.get("Cookie", ""))
-            morsel = cookie.get(SESSION_COOKIE)
-            if morsel:
-                SESSIONS.pop(morsel.value, None)
-            self.send_json({"ok": True}, headers=self.session_headers("", 0))
-            return
-        if path not in ("/api/login", "/api/register"):
-            self.send_error(HTTPStatus.NOT_FOUND)
-            return
-        try:
-            data = self.read_json()
-            if not isinstance(data, dict):
-                raise ValueError("Invalid request.")
-            username = data.get("username", "")
-            password = data.get("password", "")
-            if not isinstance(username, str) or not isinstance(password, str):
-                raise ValueError("Enter a username and password.")
-            username = username.strip()
-            if len(username) < 3 or len(username) > 32 or not re.fullmatch(r"[A-Za-z0-9_.-]+", username):
-                raise ValueError("Username must be 3-32 letters, numbers, dots, underscores, or hyphens.")
-            if len(password) < 12 or len(password) > 256:
-                raise ValueError("Password must be between 12 and 256 characters.")
-
-            with connect_db() as database:
-                existing = database.execute("SELECT username, salt, password_hash, is_owner FROM users WHERE username = ? COLLATE NOCASE", (username,)).fetchone()
-                if path == "/api/register":
-                    if existing:
-                        raise ValueError("That username is already in use.")
-                    salt = secrets.token_bytes(16)
-                    database.execute("INSERT INTO users (username, salt, password_hash, is_owner) VALUES (?, ?, ?, 0)", (username, salt, password_hash(password, salt)))
-                    existing = database.execute("SELECT username, salt, password_hash, is_owner FROM users WHERE username = ? COLLATE NOCASE", (username,)).fetchone()
-                elif not existing or not hmac.compare_digest(password_hash(password, existing["salt"]), existing["password_hash"]):
-                    self.send_json({"error": "Username or password is incorrect."}, HTTPStatus.UNAUTHORIZED)
-                    return
-
-            token = secrets.token_urlsafe(32)
-            SESSIONS[token] = (existing["username"], time.time() + SESSION_TTL)
-            self.send_json({"user": {"username": existing["username"], "isOwner": bool(existing["is_owner"]) }}, headers=self.session_headers(token))
-        except ValueError as error:
-            self.send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
-        except sqlite3.IntegrityError:
-            self.send_json({"error": "That username is already in use."}, HTTPStatus.CONFLICT)
-
-    def do_PUT(self) -> None:
-        if getattr(self.server, "paused", False):
-            self.send_paused()
-            return
-        if urlsplit(self.path).path != "/api/content":
-            self.send_error(HTTPStatus.NOT_FOUND)
-            return
-        if not self.validate_origin():
-            self.send_json({"error": "Request origin not allowed."}, HTTPStatus.FORBIDDEN)
-            return
-        user = self.user()
-        if not user or not user["is_owner"]:
-            self.send_json({"error": "Owner sign-in is required."}, HTTPStatus.FORBIDDEN)
-            return
-        try:
-            candidate = validate_content(self.read_json(), DEFAULT_CONTENT)
-            CONTENT_FILE.write_text(json.dumps(candidate, indent=2, ensure_ascii=False), encoding="utf-8")
-            self.send_json({"ok": True, "content": candidate})
-        except ValueError as error:
-            self.send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
-        except OSError:
-            self.send_json({"error": "Could not save site content on the server."}, HTTPStatus.INTERNAL_SERVER_ERROR)
+@app.errorhandler(413)
+def request_too_large(_error):
+    return jsonify(error="Request body is too large."), 413
 
 
 def main() -> None:
     initialize()
     host = os.environ.get("HOST", "127.0.0.1")
     port = int(os.environ.get("PORT", "8000"))
-    server = ThreadingHTTPServer((host, port), SiteHandler)
     print(f"Platinum Optimizer + Homi is running at http://{host}:{port}")
     print("Owner credentials are loaded from environment/.env; IP addresses do not grant admin access.")
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\nServer stopped.")
-    finally:
-        server.server_close()
+    app.run(host=host, port=port, threaded=True, debug=False)
 
 
 if __name__ == "__main__":
